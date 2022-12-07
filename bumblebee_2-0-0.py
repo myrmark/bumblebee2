@@ -7,20 +7,23 @@ import threading
 import pymysql
 import paramiko
 import os
-import mysql.connector
+#import mysql.connector
 import csv
 import io
 
 from threading import Thread
 from subprocess import Popen, PIPE, STDOUT, call
 from paramiko.ssh_exception import *
-from PyQt5 import QtCore
+from PyQt5 import QtCore, QtTest
 from PyQt5.Qt import QApplication, QClipboard
 from PyQt5.QtCore import pyqtSlot
 from PyQt5.QtGui import QColor
 from queue import Queue
 from splinter import Browser
 from selenium.webdriver.common.keys import Keys
+from selenium import webdriver
+from selenium.webdriver.firefox.options import Options
+from selenium.webdriver.common.by import By
 
 
 dbpw = keyring.get_password("172.28.88.47", "simdbuploader")
@@ -265,25 +268,28 @@ def modemcheck(self, sap):
         elif dbmodemmodel != "None":
             #self.textBrowser.append(f"Verifying slot {i}")
             #QApplication.processEvents()
-            while True:
+            for x in range(5):
                 impmodem = send_ssh_command(f"/lib/api/connectivity.umts.hwinfo 10{i}")[0].strip()
                 if impmodem == "-1":
                     coloredtext(self, f"Unable to read modem type from slot {i}. Restarting modem and waiting for 30 seconds", black, normal)
                     send_ssh_command(f"wan_cli -i 10{i} softwarereset")
                     time.sleep(30)
-                elif impmodem != "-1" and impmodem != dbmodemmodel:
+                elif impmodem != "-1" and dbmodemmodel not in impmodem:
                     coloredtext(self, "Modem slot does not seem to be empty, but it does not match the database. Trying again...", black, normal)
                     coloredtext(self, "Restarting modem and waiting for 30 seconds", black, normal)
                     send_ssh_command(f"wan_cli -i 10{i} softwarereset")
                     time.sleep(30)
-                    impmodem = send_ssh_command(f"/lib/api/connectivity.umts.hwinfo 10{i}")
-                    impmodem=''.join(outlines)
-                    impmodem = str(impmodem).strip()
-                    if impmodem != "-1" and impmodem != dbmodemmodel:
+                    try:
+                        impmodem = send_ssh_command(f"/lib/api/connectivity.umts.hwinfo 10{i}")
+                        impmodem=''.join(outlines)
+                        impmodem = str(impmodem).strip()
+                    except Exception:
+                        print(Exception)
+                    if impmodem != "-1" and dbmodemmodel not in impmodem:
                         fail = True
                         coloredtext(self, "Unable to match modem in slot {i} with database in the given time", black, normal)
                         coloredtext(self, f"Modem 10{i} verification FAIL", red, normal)
-                elif impmodem != "-1" and impmodem == dbmodemmodel:
+                elif impmodem != "-1" and dbmodemmodel in impmodem:
                     coloredtext(self, f"Modem slot {i} verification PASS", green, normal)
                     modems.update({key: impmodem})
                     break
@@ -311,25 +317,37 @@ def modemfirmwarecheck(self, sap):
                 dbfirmwares.append(x)
             #coloredtext(self, f"Verifying slot {i}", "black")
             for x in range(10):
+                print('Im here')
                 test = """\',\'"""
                 try:
                     impfirmware = send_ssh_command(f"""sqlite3 /tmp/wanmanager2.sqlite3 .d | grep "10{i}" | grep 'firmware_revision'""")[0].strip().split("','")[2]
+                    print('1',impfirmware)
+                    impfirmware = impfirmware.split()[0]+" "+impfirmware.split()[1]
+                    print('2',impfirmware)
                 except Exception:
-                    impfirmware = "None"
-                    pass
+                    print(Exception)
+                    print('impfirmware is none')
                 if impfirmware in dbfirmwares:
                     coloredtext(self, f"Modem{i} firmware verification PASS", green, normal)
                     modemfirmwares.update({key: impfirmware})
                     break
-                elif len(impfirmware) >= 3 and impfirmware not in dbfirmwares:
-                    coloredtext(self, "Firmware reported by modem does not match the database. The modem probably needs a new firmware", black, normal)
-                    coloredtext(self, f"The firmware reports the following firmware: {impfirmware}", black, normal)
-                    coloredtext(self, f"Modem{i} firmware verification FAIL", red, normal)
-                    if x == 10:
+                elif len(impfirmware) >= 5 and impfirmware not in dbfirmwares:
+                    if impfirmware == 'M0H.020201' and 'M0H.020202' in dbfirmwares:
+                        coloredtext(self, "Firmware reported by modem does not match the database, but has an accepted firmware", black, normal)
+                        coloredtext(self, f"Modem{i} firmware verification PASS", green, normal)
+                        modemfirmwares.update({key: impfirmware})
+                        break
+                    else:
+                        coloredtext(self, "Firmware reported by modem does not match the database. The modem probably needs a new firmware", black, normal)
+                        coloredtext(self, f"The firmware reports the following firmware: {impfirmware}", black, normal)
+                        coloredtext(self, f"Modem{i} firmware verification FAIL", red, normal)
                         fail = True
+                        break
                 else:
                     coloredtext(self, f"Unable to read modem firmware from slot {i}. Restarting modem and waiting for 30 seconds", black, normal)
                     send_ssh_command(f"wan_cli -i 10{i} softwarereset")
+                    if x == 10:
+                        fail = True
                     time.sleep(30)
     return fail, modemfirmwares
 
@@ -351,17 +369,20 @@ def modemimeicheck(self, sap):
             coloredtext(self, f"Slot {i} is unused", black, normal)
         else:
             for x in range(10):
-                imei = send_ssh_command(f"""sqlite3 /tmp/wanmanager2.sqlite3 .d |grep -w "10{i}"|grep imei | awk -F"','" '{{print $3}}'""")[0].strip()
-                if len(imei) >= 10:
-                    coloredtext(self, f"Modem{i} IMEI verification PASS", green, normal)
-                    imeis.update({key: imei})
-                    break
-                elif len(imei) <= 10:
-                    coloredtext(self, f"Unable to read modem IMEI from slot {i}. Restarting modem and waiting for 30 seconds", black, normal)
-                    send_ssh_command(f"wan_cli -i 10{i} softwarereset")
-                    time.sleep(30)
-                    if x == 10:
-                        fail = True
+                try:
+                    imei = send_ssh_command(f"""sqlite3 /tmp/wanmanager2.sqlite3 .d |grep -w "10{i}"|grep imei | awk -F"','" '{{print $3}}'""")[0].strip()
+                    if len(imei) >= 10:
+                        coloredtext(self, f"Modem{i} IMEI verification PASS", green, normal)
+                        imeis.update({key: imei})
+                        break
+                    elif len(imei) <= 10:
+                        coloredtext(self, f"Unable to read modem IMEI from slot {i}. Restarting modem and waiting for 30 seconds", black, normal)
+                        send_ssh_command(f"wan_cli -i 10{i} softwarereset")
+                        time.sleep(30)
+                        if x == 10:
+                            fail = True
+                except Exception:
+                   coloredtext(self, f"Unknown error", black, normal)
     return fail, imeis
 
 
@@ -391,9 +412,6 @@ def wificheck(self, sap):
 
 
 def impinstallercheck(self):
-    def stop(self):
-        return
-    self.pushButton_2.clicked.connect(stop(self))
     try:
         test = ""
         ssh = paramiko.SSHClient()
@@ -407,7 +425,8 @@ def impinstallercheck(self):
         coloredtext(self, "Waiting for host to boot..", black, normal)
     if "Installation complete" in test:
         coloredtext(self, "Installation complete", green, normal)
-        return
+        return True
+    QtTest.QTest.qWait(10000)
     impinstallercheck(self)
     
 
@@ -418,8 +437,8 @@ class Ui(QtWidgets.QMainWindow):
         self.show()
         self.actionBumblebee.triggered.connect(self.bumblebeegui)
         self.actionUpdate_Peak.triggered.connect(self.updatepeakgui)
-#        self.actionIMP_installer_check.triggered.connect(self.impinstallergui)
-        self.actionIMP_installer_check.triggered.connect(self.filipstartgui)
+        self.actionIMP_installer_check.triggered.connect(self.impinstallergui)
+#        self.actionIMP_installer_check.triggered.connect(self.filipstartgui)
 
     def filipstartgui(self, serial):
         uic.loadUi('impinstallercheck.ui', self)
@@ -451,51 +470,71 @@ class Ui(QtWidgets.QMainWindow):
             for row in f:
                 customers.append(row.strip())
         self.comboBox.addItems(customers)
+        self.comboBox.setCurrentIndex(363)
         self.lineEdit.setFocus()
         self.pushButton.clicked.connect(self.updatepeakstart)
         self.lineEdit.returnPressed.connect(self.updatepeakstart)
 
-    #@pyqtSlot
     def impinstallergui(self):
         uic.loadUi('impinstallercheck.ui', self)
-        self.pushButton.clicked.connect(coloredtext(self, "Starting", black, normal), impinstallercheck(self))
+        self.actionBumblebee.triggered.connect(self.bumblebeegui)
+        self.actionUpdate_Peak.triggered.connect(self.updatepeakgui)
+        self.actionIMP_installer_check.triggered.connect(self.impinstallergui)
+        status = impinstallercheck(self)
+#        self.pushButton.clicked.connect(coloredtext(self, "Starting", black, normal), self.impinstallerstart)
 
+#    def impinstallerstart(self):
+#        impinstallercheck()
 
     def updatepeakstart(self):
         self.textBrowser.clear()
         coloredtext(self, "Starting..", black, normal)
         try:
+            
             customer = str(self.comboBox.currentText()).strip()
             serial = str(self.lineEdit.text())
-            browser = Browser(headless=True)
-            browser.visit("https://peak.icomera.com/devices")
-            browser.find_by_css('#user_email').fill('filip.malmberg@icomera.com')
-            browser.find_by_css('#user_password').fill('abcd1234')
+            #options = Options()
+            #options.headless = True
+            #browser2 = webdriver.Firefox(options=options)
+            browser2 = webdriver.Firefox()
+            browser2.get("https://peak.icomera.com/devices")
+            browser2.find_element(by=By.CSS_SELECTOR, value="#user_email").send_keys("filip.malmberg@icomera.com")
+            browser2.find_element(by=By.CSS_SELECTOR, value="#user_password").send_keys("abcd1234")
             coloredtext(self, "Signing in", black, normal)
-            browser.is_element_visible_by_xpath("/html/body/div/div[4]/div[2]/div[3]/form/div/div/div/div[3]/div[2]/input", wait_time=10)
-            browser.find_by_xpath("/html/body/div/div[4]/div[2]/div[3]/form/div/div/div/div[3]/div[2]/input").click()
-            browser.reload()
-            browser.find_by_css('#search').fill(f'{serial}')
-            searchfield = browser.find_by_css('#search')
-            searchfield.type(Keys.RETURN)
+            browser2.find_element(by=By.XPATH, value="/html/body/div/div[4]/div[2]/div[3]/form/div/div/div/div[3]/div[2]/input").click()
+            browser2.implicitly_wait(20)
+            browser2.refresh()
+            browser2.find_element(by=By.CSS_SELECTOR, value="#search").send_keys(f'{serial}')
+            searchfield = browser2.find_element(by=By.CSS_SELECTOR, value="#search")
+            searchfield.send_keys(Keys.RETURN)
+            browser2.implicitly_wait(20)
             coloredtext(self, "Updating information for device in Peak", black, normal)
-            browser.find_by_xpath("/html/body/div/div[5]/div[1]/div[2]/form/p/input[2]").click()
-            certificate_link = browser.find_by_xpath("//td[. = '{}']/following-sibling::td/a".format(serial)).first.click()
-            browser.is_text_present('Edit:', wait_time=10)
-            browser.find_by_css('#device_system_name').fill('{}'.format(serial))
-            mac = browser.find_by_css('#device_mac')
-            mac = mac.value
+            browser2.find_element(by=By.XPATH, value="/html/body/div/div[5]/div[1]/div[2]/form/p/input[2]").click()
+            browser2.implicitly_wait(20)
+            browser2.find_element(by=By.XPATH, value="//*[text()='22000681']/following-sibling::td/a").click()
+            browser2.implicitly_wait(20)
+            browser2.find_element(by=By.CSS_SELECTOR, value="#device_system_name").clear()
+            browser2.find_element(by=By.CSS_SELECTOR, value="#device_system_name").send_keys('{}'.format(serial))
+            mac = browser2.find_element(by=By.CSS_SELECTOR, value="#device_mac")
+            mac = mac.get_attribute("value")
             mac = mac[4:]
             systemid = int(mac, 16)
-            browser.find_by_css('#device_system_id').fill('{}'.format(systemid))
-            browser.find_option_by_text(f'{customer}').first.click()
-            browser.find_by_xpath("/html/body/div/div[5]/div[1]/div[2]/form/div[2]/input").click()
+            print(systemid)
+            browser2.find_element(by=By.CSS_SELECTOR, value="#device_system_id").clear()
+            browser2.find_element(by=By.CSS_SELECTOR, value="#device_system_id").send_keys('{}'.format(systemid))
+            browser2.find_element(by=By.XPATH, value=f"//*[contains(text(), '{customer}')]").click()
+            browser2.implicitly_wait(20)
+            browser2.find_element(by=By.XPATH, value="/html/body/div/div[5]/div[1]/div[2]/form/div[2]/input").click()
+            browser2.implicitly_wait(20)
             coloredtext(self, "Saving..", black, normal)
-            browser.is_text_present('Edit | Back', wait_time=10)
+            browser2.find_element(by=By.XPATH, value="/html/body/div/div[5]/div[1]/div[2]/div[3]/div/table/tbody/tr/td[3]/a").click()
+            browser2.implicitly_wait(20)
+            browser2.switch_to.alert.accept()
             coloredtext(self, "Verifying information..", black, normal)
-            browser.reload()
-            systemidcheck = browser.find_by_xpath("/html/body/div/div[5]/div[1]/div[2]/div[2]/div/div/div[1]/table/tbody/tr[6]").first.value
-            customercheck = browser.find_by_xpath("/html/body/div/div[5]/div[1]/div[2]/div[2]/div/div/div[1]/table/tbody/tr[10]").first.value
+            browser2.refresh()
+            browser2.implicitly_wait(20)
+            systemidcheck = browser2.find_element(by=By.XPATH, value="/html/body/div/div[5]/div[1]/div[2]/div[2]/div/div/div[1]/table/tbody/tr[6]")get_attribute("value")
+            customercheck = browser2.find_element(by=By.XPATH, value="/html/body/div/div[5]/div[1]/div[2]/div[2]/div/div/div[1]/table/tbody/tr[10]")get_attribute("value")
             fail = False
             if str(systemid) not in systemidcheck:
                 fail = True
@@ -508,12 +547,12 @@ class Ui(QtWidgets.QMainWindow):
             coloredtext(self, f"{customercheck}", black, normal)
             coloredtext(self, f"{systemidcheck}", black, normal)
         except Exception as e:
-            heavyloadcheck = browser.is_text_present('heavy load', wait_time=10)
-            if heavyloadcheck == True:
-                coloredtext(self, "Peak is weak and can't handle the pressure.. Please try again.", black, bold)
-            else:
-                coloredtext(self, "Something went wrong...", red, bold)
-                coloredtext(self, f"{e}", black, normal)
+            #heavyloadcheck = browser.is_text_present('heavy load', wait_time=10)
+            #if heavyloadcheck == True:
+            #coloredtext(self, "Peak is weak and can't handle the pressure.. Please try again.", black, bold)
+            #else:
+            coloredtext(self, "Something went wrong...", red, bold)
+            coloredtext(self, f"{e}", black, normal)
 
     def bumblebeestart(self):
         fail = False
@@ -535,9 +574,8 @@ class Ui(QtWidgets.QMainWindow):
         imp = send_ssh_command("/lib/api/system.imageversion")[0].replace("\n", "").strip()
         coloredtext(self, f"Installed IMP is: {imp}\n", black, normal)
         if imp != dbimp:
-            print(imp)
-            print(dbimp)
             coloredtext(self, "Installed IMP does not match specified IMP in database", black, normal)
+            coloredtext(self, "IMP verification FAIL", red, normal)
             fail = True
         else:
             coloredtext(self, "IMP verification PASS", green, normal)
@@ -548,7 +586,10 @@ class Ui(QtWidgets.QMainWindow):
             coloredtext(self, "Unable to fetch MAC from IMP", black, normal)
             coloredtext(self, "MAC verification FAIL", red, normal)
             fail = True
-        impserial = send_ssh_command("cat /var/log/persistent/serial_nr")[0].replace("\n", "").strip()
+        try:
+            impserial = send_ssh_command("cat /var/log/persistent/serial_nr")[0].replace("\n", "").strip()
+        except Exception:
+            impserial = ""
         if len(impserial) < 6:
             coloredtext(self, "Unable to fetch serial from IMP", black, normal)
             fail = True
