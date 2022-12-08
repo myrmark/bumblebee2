@@ -519,7 +519,6 @@ class Ui(QtWidgets.QMainWindow):
             mac = mac.get_attribute("value")
             mac = mac[4:]
             systemid = int(mac, 16)
-            print(systemid)
             browser2.find_element(by=By.CSS_SELECTOR, value="#device_system_id").clear()
             browser2.find_element(by=By.CSS_SELECTOR, value="#device_system_id").send_keys('{}'.format(systemid))
             browser2.find_element(by=By.XPATH, value=f"//*[contains(text(), '{customer}')]").click()
@@ -533,26 +532,37 @@ class Ui(QtWidgets.QMainWindow):
             coloredtext(self, "Verifying information..", black, normal)
             browser2.refresh()
             browser2.implicitly_wait(20)
-            systemidcheck = browser2.find_element(by=By.XPATH, value="/html/body/div/div[5]/div[1]/div[2]/div[2]/div/div/div[1]/table/tbody/tr[6]")get_attribute("value")
-            customercheck = browser2.find_element(by=By.XPATH, value="/html/body/div/div[5]/div[1]/div[2]/div[2]/div/div/div[1]/table/tbody/tr[10]")get_attribute("value")
+            systemidcheck = browser2.find_element(by=By.XPATH, value="/html/body/div/div[5]/div[1]/div[2]/div[2]/div/div/div[1]/table/tbody/tr[6]/td[2]")
+            customercheck = browser2.find_element(by=By.XPATH, value="/html/body/div/div[5]/div[1]/div[2]/div[2]/div/div/div[1]/table/tbody/tr[10]/td[2]/a")
+            systemidcheck = systemidcheck.get_attribute("value")
+            customercheck = customercheck.get_attribute("value")
+            print(systemidcheck, customercheck)
             fail = False
-            if str(systemid) not in systemidcheck:
-                fail = True
-            if customer not in customercheck:
-                fail = True
+            try:
+                if str(systemid) not in systemidcheck:
+                    fail = True
+                if customer not in customercheck:
+                    fail = True
+            except Exception:
+                pass
             if fail == True:
                 coloredtext(self, "Failed to update device. Please try again", red, bold)
             else:
                 coloredtext(self, "Successfully updated device in Peak", green, bold)
             coloredtext(self, f"{customercheck}", black, normal)
             coloredtext(self, f"{systemidcheck}", black, normal)
+            browser2.close()
         except Exception as e:
-            #heavyloadcheck = browser.is_text_present('heavy load', wait_time=10)
-            #if heavyloadcheck == True:
+            #try:
+            #/html/body/h2
+                #heavyloadcheck = browser2.find_element(by=By.XPATH, value="/html/body/h2")
+                #heavyloadcheck.get_attribute("value")
+                #if heavyloadcheck == True:
             #coloredtext(self, "Peak is weak and can't handle the pressure.. Please try again.", black, bold)
             #else:
             coloredtext(self, "Something went wrong...", red, bold)
             coloredtext(self, f"{e}", black, normal)
+            browser2.close()
 
     def bumblebeestart(self):
         fail = False
