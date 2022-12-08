@@ -327,28 +327,33 @@ def modemfirmwarecheck(self, sap):
                 except Exception:
                     print(Exception)
                     print('impfirmware is none')
-                if impfirmware in dbfirmwares:
-                    coloredtext(self, f"Modem{i} firmware verification PASS", green, normal)
-                    modemfirmwares.update({key: impfirmware})
-                    break
-                elif len(impfirmware) >= 5 and impfirmware not in dbfirmwares:
-                    if impfirmware == 'M0H.020201' and 'M0H.020202' in dbfirmwares:
-                        coloredtext(self, "Firmware reported by modem does not match the database, but has an accepted firmware", black, normal)
+                try:
+                    if impfirmware in dbfirmwares:
                         coloredtext(self, f"Modem{i} firmware verification PASS", green, normal)
                         modemfirmwares.update({key: impfirmware})
                         break
+                    elif len(impfirmware) >= 5 and impfirmware not in dbfirmwares:
+                        if impfirmware == 'M0H.020201' and 'M0H.020202' in dbfirmwares:
+                            coloredtext(self, "Firmware reported by modem does not match the database, but has an accepted firmware", black, normal)
+                            coloredtext(self, f"Modem{i} firmware verification PASS", green, normal)
+                            modemfirmwares.update({key: impfirmware})
+                            break
+                        else:
+                            coloredtext(self, "Firmware reported by modem does not match the database. The modem probably needs a new firmware", black, normal)
+                            coloredtext(self, f"The firmware reports the following firmware: {impfirmware}", black, normal)
+                            coloredtext(self, f"Modem{i} firmware verification FAIL", red, normal)
+                            fail = True
+                            break
                     else:
-                        coloredtext(self, "Firmware reported by modem does not match the database. The modem probably needs a new firmware", black, normal)
-                        coloredtext(self, f"The firmware reports the following firmware: {impfirmware}", black, normal)
-                        coloredtext(self, f"Modem{i} firmware verification FAIL", red, normal)
-                        fail = True
-                        break
-                else:
-                    coloredtext(self, f"Unable to read modem firmware from slot {i}. Restarting modem and waiting for 30 seconds", black, normal)
-                    send_ssh_command(f"wan_cli -i 10{i} softwarereset")
-                    if x == 10:
-                        fail = True
-                    time.sleep(30)
+                        coloredtext(self, f"Unable to read modem firmware from slot {i}. Restarting modem and waiting for 30 seconds", black, normal)
+                        send_ssh_command(f"wan_cli -i 10{i} softwarereset")
+                        if x == 10:
+                            fail = True
+                        time.sleep(30)
+                except Exception:
+                    fail = True
+                    coloredtext(self, "Unknown error", red, normal)
+                    coloredtext(self, f"Modem{i} firmware verification FAIL", red, normal)
     return fail, modemfirmwares
 
 
@@ -399,11 +404,16 @@ def wificheck(self, sap):
             coloredtext(self, f"Slot {i} is unused", black, normal)
 
         else:
-            mac = send_ssh_command(f"cat /sys/class/net/wlan{i}/address")[0].strip()
-            if len(mac) == 17:
-                coloredtext(self, f"Wi-Fi{i} verification PASS", green, normal)
-                wifis.update({key: mac})
-            elif len(mac) <= 16:
+            try:
+                mac = send_ssh_command(f"cat /sys/class/net/wlan{i}/address")[0].strip()
+                if len(mac) == 17:
+                    coloredtext(self, f"Wi-Fi{i} verification PASS", green, normal)
+                    wifis.update({key: mac})
+                elif len(mac) <= 16:
+                    coloredtext(self, f"Unable to read Wi-Fi from slot {i}", black, normal)
+                    coloredtext(self, f"Wi-Fi slot {i} verification FAIL", red, normal)
+                    fail = True
+            except Exception:
                 coloredtext(self, f"Unable to read Wi-Fi from slot {i}", black, normal)
                 coloredtext(self, f"Wi-Fi slot {i} verification FAIL", red, normal)
                 fail = True
@@ -509,9 +519,10 @@ class Ui(QtWidgets.QMainWindow):
             searchfield.send_keys(Keys.RETURN)
             browser2.implicitly_wait(20)
             coloredtext(self, "Updating information for device in Peak", black, normal)
-            browser2.find_element(by=By.XPATH, value="/html/body/div/div[5]/div[1]/div[2]/form/p/input[2]").click()
-            browser2.implicitly_wait(20)
-            browser2.find_element(by=By.XPATH, value="//*[text()='22000681']/following-sibling::td/a").click()
+            #browser2.find_element(by=By.XPATH, value="/html/body/div/div[5]/div[1]/div[2]/form/p/input[2]").click()
+            #browser2.implicitly_wait(20)
+            browser2.find_element(by=By.XPATH, value=f"//*[text()='{serial}']/following-sibling::td/a").click()
+            #/html/body/div/div[5]/div[1]/div[2]/table/tbody/tr[1]/td[1]
             browser2.implicitly_wait(20)
             browser2.find_element(by=By.CSS_SELECTOR, value="#device_system_name").clear()
             browser2.find_element(by=By.CSS_SELECTOR, value="#device_system_name").send_keys('{}'.format(serial))
