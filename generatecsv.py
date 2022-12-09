@@ -1,6 +1,6 @@
 #!/bin/python3
 
-import sys, pymysql, keyring, getpass, mysql.connector, csv
+import sys, pymysql, keyring, getpass, csv
 from prompt_toolkit import prompt
 
 def export(monumber): 											#Export a MO from the database to a .csv file
