@@ -18,7 +18,7 @@ def export(monumber): 											#Export a MO from the database to a .csv file
     if routertype == "R01" or routertype == "X3":
         cursor.execute("SELECT serial,impversion,mac,iccid1,iccid2,iccid3,iccid4,iccid5,iccid6,iccid7,iccid8,wifi0,wifi1,modemimei3,modemimei4,modemimei5,modemmodel3,modemmodel4,modemmodel5,modemfirmware3,modemfirmware4,modemfirmware5 FROM simdb.configuredunits WHERE manufacturingorder='{}'".format(monumber)) 								#Execute the query
     elif routertype == "R02" or routertype == "R02/R04" or routertype == "R04":
-        cursor.execute("SELECT serial,impvertsion,mac,iccid1,iccid2,iccid3,iccid4,iccid5,iccid6,iccid7,iccid8,iccid9,iccid10,iccid11,iccid12,iccid13,iccid14,iccid15,iccid16,wifi0,modemimei2,modemimei3,modemimei4,modemimei5,modemmodel2,modemmodel3,modemmodel4,modemmodel5,modemfirmware2,modemfirmware3,modemfirmware4,modemfirmware5 FROM simdb.configuredunits WHERE manufacturingorder='{}'".format(monumber)) 				#Execute the query
+        cursor.execute("SELECT serial,impversion,mac,iccid1,iccid2,iccid3,iccid4,iccid5,iccid6,iccid7,iccid8,iccid9,iccid10,iccid11,iccid12,iccid13,iccid14,iccid15,iccid16,wifi0,modemimei2,modemimei3,modemimei4,modemimei5,modemmodel2,modemmodel3,modemmodel4,modemmodel5,modemfirmware2,modemfirmware3,modemfirmware4,modemfirmware5 FROM simdb.configuredunits WHERE manufacturingorder='{}'".format(monumber)) 				#Execute the query
     output = cursor.fetchall()
     db.close() 											#Close the connection
     cursor.close() 											#Close the connection
