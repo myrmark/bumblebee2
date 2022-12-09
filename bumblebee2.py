@@ -87,6 +87,10 @@ def dbupload(self, sap, projectid, mo, serial, mac, dbroutertype, imp, modems, f
     db.close()
     coloredtext(self, f"Configured unit ID is: {unitid}", black, normal)
     coloredtext(self, f"Remaining units on MO is: {moremaining}", black, normal)
+    if moremaining == 0:
+        generatecsv.export(mo)
+        sendmail.main(projectid)
+
 
 
 class ThreadWithResult(threading.Thread):
