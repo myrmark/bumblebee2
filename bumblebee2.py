@@ -508,6 +508,7 @@ class Ui(QtWidgets.QMainWindow):
 
     def send_email(self):
         mo = str(self.lineEdit_3.text())
+        self.lineEdit_3.clear()
         if len(mo) != 7:
             coloredtext(self, "Enter a valid MO number", red, bold)
             return
@@ -517,6 +518,7 @@ class Ui(QtWidgets.QMainWindow):
                 projectid = dbquery("projectid", "articles", "articlenumber", sap)
                 generatecsv.export(mo)
                 sendmail.main(projectid)
+                coloredtext(self, "Successfully sent email!", green, bold)
             except Exception:
                 coloredtext(self, "Unexpected error", red, bold)
 
