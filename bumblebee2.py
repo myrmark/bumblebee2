@@ -1,29 +1,34 @@
-from PyQt5 import QtWidgets, uic
-import sys
-import subprocess
-import keyring
-import time
-import threading
-import pymysql
-import paramiko
-import os
-#import mysql.connector
-import csv
-import io
+#!/bin/python3
 
-from threading import Thread
-from subprocess import Popen, PIPE, STDOUT, call
+#Author Filip Malmberg
+
+import csv
+import generatecsv
+import io
+import keyring
+import os
+import paramiko
+import pymysql
+import sendmail
+import subprocess
+import sys
+import threading
+import time
+
 from paramiko.ssh_exception import *
 from PyQt5 import QtCore, QtTest
 from PyQt5.Qt import QApplication, QClipboard
 from PyQt5.QtCore import pyqtSlot
 from PyQt5.QtGui import QColor
+from PyQt5 import QtWidgets, uic
 from queue import Queue
-from splinter import Browser
 from selenium.webdriver.common.keys import Keys
 from selenium import webdriver
 from selenium.webdriver.firefox.options import Options
 from selenium.webdriver.common.by import By
+from splinter import Browser
+from subprocess import Popen, PIPE, STDOUT, call
+from threading import Thread
 
 
 dbpw = keyring.get_password("172.28.88.47", "simdbuploader")
