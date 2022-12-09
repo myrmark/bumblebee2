@@ -1,6 +1,6 @@
 #!/bin/python3
 
-import smtplib, email, sys, pymysql, keyring, getpass, mysql.connector
+import smtplib, email, sys, pymysql, keyring, getpass
 from email import encoders
 from email.message import EmailMessage
 from prompt_toolkit import prompt
