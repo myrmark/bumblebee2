@@ -480,6 +480,7 @@ class Ui(QtWidgets.QMainWindow):
         self.lineEdit.returnPressed.connect(self.bumblebeestart)
         self.pushButton.clicked.connect(self.populate_systemid)
         self.pushButton_2.clicked.connect(self.copy_systemid)
+        self.pushButton_3.clicked.connect(self.send_email)
 
     def updatepeakgui(self):
         uic.loadUi('updatepeak.ui', self)
@@ -504,6 +505,20 @@ class Ui(QtWidgets.QMainWindow):
 
 #    def impinstallerstart(self):
 #        impinstallercheck()
+
+    def send_email(self):
+        mo = str(self.lineEdit_3.text())
+        if len(mo) != 7:
+            coloredtext(self, "Enter a valid MO number", red, bold)
+            return
+        else:
+            try:
+                sap = dbquery("moarticle", "manufacturingorder", "monumber", mo)
+                projectid = dbquery("projectid", "articles", "articlenumber", sap)
+                generatecsv.export(mo)
+                sendmail.main(projectid)
+            except Exception:
+                coloredtext(self, "Unexpected error", red, bold)
 
     def updatepeakstart(self):
         self.textBrowser.clear()
